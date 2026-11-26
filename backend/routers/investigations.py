@@ -21,7 +21,8 @@ from backend.db.database import get_investigation, list_investigations, save_inv
 from backend.schemas.claim import ClaimSubmission
 from backend.schemas.investigation import Investigation
 from backend.services.mock_pipeline import run_mock_pipeline
-from backend.services.gemini_pipeline import run_gemini_decomposition_pipeline
+from backend.services.search_providers import SearchProviderError
+from backend.services.investigation_graph import run_langgraph_pipeline
 from backend.services.gemini_service import (
     GeminiProviderError,
     MalformedGeminiOutputError,
@@ -54,7 +55,7 @@ def create_investigation(
         if use_mock:
             investigation = run_mock_pipeline(submission)
         else:
-            investigation = run_gemini_decomposition_pipeline(submission)
+            investigation = run_langgraph_pipeline(submission)
     except MissingGeminiAPIKeyError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -66,6 +67,11 @@ def create_investigation(
             detail=str(exc),
         ) from exc
     except GeminiProviderError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+    except SearchProviderError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),

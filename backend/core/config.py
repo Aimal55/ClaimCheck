@@ -23,9 +23,21 @@ class Settings(BaseSettings):
     claim_min_length: int = 10
     claim_max_length: int = 2000
 
-    # Gemini atomic-claim decomposition
+    # Gemini atomic-claim decomposition and verdicts
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_embedding_model: str = "gemini-embedding-001"
+
+    # Search and retrieval
+    search_provider: str = "wikipedia"
+    tavily_api_key: str = ""
+    search_result_limit: int = 8
+    extraction_timeout_seconds: float = 12.0
+    chunk_size: int = 900
+    chunk_overlap: int = 120
+    retrieval_chunk_limit: int = 12
+    reranker_enabled: bool = False
+    reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
     model_config = SettingsConfigDict(
         env_file=".env",

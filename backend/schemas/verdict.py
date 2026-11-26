@@ -44,6 +44,10 @@ class Verdict(BaseModel):
         ...,
         description="Plain-language explanation of how the verdict was reached.",
     )
+    supporting_passage_ids: list[str] = Field(default_factory=list)
+    refuting_passage_ids: list[str] = Field(default_factory=list)
+    cited_source_urls: list[str] = Field(default_factory=list)
+    limitations: str | None = None
     is_mock: bool = Field(
         default=False,
         description="True when this verdict was produced by the mock pipeline.",

@@ -163,6 +163,43 @@ To replace the mock with a real pipeline:
 
 ---
 
+## Live MVP Pipeline
+
+The live endpoint is:
+
+```text
+POST /api/v1/investigations?use_mock=false
+```
+
+Default live search uses Wikipedia, which is key-free. For broader web search, set `SEARCH_PROVIDER=tavily` and provide `TAVILY_API_KEY`. Tavily is a paid/credit provider; verify current limits before use.
+
+The live pipeline:
+
+1. Uses Gemini to extract atomic factual claims.
+2. Searches sources and extracts readable text with Trafilatura.
+3. Creates overlapping chunks with character offsets.
+4. Uses BM25 plus Gemini embeddings, fused with reciprocal rank fusion.
+5. Optionally uses a cross-encoder reranker when `RERANKER_ENABLED=true` and `sentence-transformers` is installed.
+6. Uses Gemini to produce Pydantic-validated evidence verdicts with passage IDs and source URLs.
+
+Mock mode remains available through `use_mock=true` for compatibility and testing.
+
+---
+
+## LangChain and LangGraph integration
+
+Live investigations are compiled as a LangGraph `StateGraph`. The graph separates decomposition, search, extraction/chunking, retrieval, reranking, verification, quality checking, and finalization.
+
+- LangChain `Document` and `RecursiveCharacterTextSplitter` create traceable chunks.
+- `langchain-google-genai` provides Pydantic structured Gemini calls.
+- Hybrid retrieval combines BM25 and Gemini embeddings using reciprocal rank fusion.
+- Cross-encoder reranking is optional; failed or disabled reranking uses hybrid rank ordering.
+- Weak evidence receives one additional retrieval attempt. A second weak result becomes `INSUFFICIENT_EVIDENCE`.
+
+Mock mode remains available with `use_mock=true`; live mode is `use_mock=false`.
+
+---
+
 ## Development notes
 
 - **Never hardcode API keys.** Add them to `.env` and read via `Settings` in

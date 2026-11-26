@@ -15,7 +15,7 @@ import streamlit as st
 # ---------------------------------------------------------------------------
 API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 INVESTIGATIONS_URL = f"{API_BASE_URL}/api/v1/investigations?use_mock=false"
-REQUEST_TIMEOUT_SECONDS = 30
+REQUEST_TIMEOUT_SECONDS = 180
 
 # ---------------------------------------------------------------------------
 # Page config
@@ -64,7 +64,7 @@ st.markdown(
 # Header
 # ---------------------------------------------------------------------------
 st.title("🔍 ClaimCheck")
-st.caption("Evidence-based claim verification · Milestone 1 (Mock Pipeline)")
+st.caption("Evidence-based claim verification · Live Gemini + retrieval pipeline")
 st.divider()
 
 # ---------------------------------------------------------------------------
@@ -132,7 +132,7 @@ if submitted:
     if data.get("is_mock"):
         st.caption("🧪 Current result: mock pipeline")
     else:
-        st.success("✅ Atomic claims extracted by Gemini (Phase 1)")
+        st.success("✅ Live Gemini decomposition and evidence assessment")
 
     # --- Investigation metadata ------------------------------------------
     st.subheader("📋 Investigation")
@@ -149,8 +149,36 @@ if submitted:
         )
         st.markdown(badge_html, unsafe_allow_html=True)
         st.markdown(f"> {verdict['explanation']}")
+        if verdict.get("confidence") is not None:
+            st.caption(f"Confidence: {verdict['confidence']:.2f}")
+        if verdict.get("supporting_passage_ids"):
+            st.caption("Supporting passage IDs: " + ", ".join(verdict["supporting_passage_ids"]))
+        if verdict.get("refuting_passage_ids"):
+            st.caption("Refuting passage IDs: " + ", ".join(verdict["refuting_passage_ids"]))
+        if verdict.get("cited_source_urls"):
+            for url in verdict["cited_source_urls"]:
+                st.markdown(f"🔗 [{url}]({url})")
+        if verdict.get("limitations"):
+            st.warning(verdict["limitations"])
         if verdict.get("is_mock"):
             st.caption("🧪 This verdict was produced by the mock pipeline.")
+
+    # --- Sources --------------------------------------------------------
+    st.subheader("🔎 Sources")
+    sources = data.get("sources", [])
+    if not sources:
+        st.info("No sources were recorded.")
+    else:
+        for source in sources:
+            with st.expander(source.get("title") or source["url"]):
+                st.markdown(f"[Open source]({source['url']})")
+                st.caption(f"Status: {source.get('extraction_status', 'unknown')}")
+                if source.get("publication_date"):
+                    st.caption(f"Published: {source['publication_date']}")
+                if source.get("retrieved_at"):
+                    st.caption(f"Retrieved: {source['retrieved_at']}")
+                if source.get("extraction_error"):
+                    st.warning(source["extraction_error"])
 
     # --- Evidence passages -----------------------------------------------
     st.subheader("📚 Evidence Passages")
@@ -195,3 +223,25 @@ if submitted:
     # --- Raw JSON (dev helper) -------------------------------------------
     with st.expander("🛠 Raw API response (debug)", expanded=False):
         st.json(data)
+
+# ---------------------------------------------------------------------------
+# Investigation history
+# ---------------------------------------------------------------------------
+st.sidebar.header("History")
+try:
+    history_response = requests.get(
+        f"{API_BASE_URL}/api/v1/investigations?limit=20",
+        timeout=10,
+    )
+    history_response.raise_for_status()
+    history = history_response.json()
+    if history:
+        for item in history:
+            st.sidebar.markdown(
+                f"`{item['id'][:8]}…` · {item['status']} · "
+                f"{'mock' if item['is_mock'] else 'live'}"
+            )
+    else:
+        st.sidebar.info("No investigations yet.")
+except requests.RequestException:
+    st.sidebar.warning("History unavailable while backend is offline.")

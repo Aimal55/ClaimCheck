@@ -57,12 +57,64 @@ CREATE TABLE IF NOT EXISTS investigations (
 );
 """
 
+CREATE_LIVE_TABLES = """
+CREATE TABLE IF NOT EXISTS sources (
+    id TEXT PRIMARY KEY,
+    investigation_id TEXT NOT NULL,
+    url TEXT NOT NULL,
+    title TEXT,
+    text TEXT,
+    publication_date TEXT,
+    retrieved_at TEXT NOT NULL,
+    extraction_status TEXT NOT NULL,
+    extraction_error TEXT,
+    search_snippet TEXT,
+    FOREIGN KEY(investigation_id) REFERENCES investigations(id)
+);
+
+CREATE TABLE IF NOT EXISTS chunks (
+    id TEXT PRIMARY KEY,
+    investigation_id TEXT NOT NULL,
+    source_id TEXT NOT NULL,
+    atomic_claim_id TEXT NOT NULL,
+    text TEXT NOT NULL,
+    char_start INTEGER NOT NULL,
+    char_end INTEGER NOT NULL,
+    lexical_score REAL,
+    semantic_score REAL,
+    fused_score REAL,
+    rerank_score REAL,
+    FOREIGN KEY(investigation_id) REFERENCES investigations(id),
+    FOREIGN KEY(source_id) REFERENCES sources(id)
+);
+
+CREATE TABLE IF NOT EXISTS evidence_passages (
+    id TEXT PRIMARY KEY,
+    investigation_id TEXT NOT NULL,
+    atomic_claim_id TEXT NOT NULL,
+    chunk_id TEXT,
+    text TEXT NOT NULL,
+    source_url TEXT,
+    source_title TEXT,
+    stance TEXT,
+    relevance_score REAL,
+    rerank_score REAL,
+    is_mock INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY(investigation_id) REFERENCES investigations(id),
+    FOREIGN KEY(chunk_id) REFERENCES chunks(id)
+);
+"""
+
 
 def init_db() -> None:
     """Create tables if they don't already exist. Called once at startup."""
     logger.info("Initialising database at %s", _DB_PATH)
     with _get_connection() as conn:
         conn.execute(CREATE_INVESTIGATIONS_TABLE)
+        for statement in CREATE_LIVE_TABLES.split(";"):
+            statement = statement.strip()
+            if statement:
+                conn.execute(statement)
     logger.info("Database ready.")
 
 
@@ -86,6 +138,75 @@ def save_investigation(investigation: Investigation) -> None:
                 investigation.model_dump_json(),
             ),
         )
+
+        for source in getattr(investigation, "sources", []):
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO sources
+                (id, investigation_id, url, title, text, publication_date, retrieved_at,
+                 extraction_status, extraction_error, search_snippet)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    source.id,
+                    investigation.id,
+                    source.url,
+                    source.title,
+                    source.text,
+                    source.publication_date,
+                    source.retrieved_at.isoformat(),
+                    source.extraction_status,
+                    source.extraction_error,
+                    source.search_snippet,
+                ),
+            )
+
+        for chunk in getattr(investigation, "chunks", []):
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO chunks
+                (id, investigation_id, source_id, atomic_claim_id, text, char_start, char_end,
+                 lexical_score, semantic_score, fused_score, rerank_score)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    chunk.id,
+                    investigation.id,
+                    chunk.source_id,
+                    chunk.atomic_claim_id,
+                    chunk.text,
+                    chunk.char_start,
+                    chunk.char_end,
+                    chunk.lexical_score,
+                    chunk.semantic_score,
+                    chunk.fused_score,
+                    chunk.rerank_score,
+                ),
+            )
+
+        for passage in investigation.evidence_passages:
+            if passage.is_mock:
+                continue
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO evidence_passages
+                (id, investigation_id, atomic_claim_id, chunk_id, text, source_url,
+                 source_title, stance, relevance_score, rerank_score, is_mock)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                """,
+                (
+                    passage.id,
+                    investigation.id,
+                    passage.atomic_claim_id,
+                    passage.chunk_id,
+                    passage.text,
+                    passage.source_url,
+                    passage.source_title,
+                    passage.stance,
+                    passage.relevance_score,
+                    passage.rerank_score,
+                ),
+            )
     logger.debug("Saved investigation %s", investigation.id)
 
 

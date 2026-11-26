@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from backend.schemas.claim import AtomicClaim, ClaimSubmission
 from backend.schemas.evidence import EvidencePassage
 from backend.schemas.verdict import Verdict
+from backend.schemas.source import EvidenceChunk, EvidenceSource
 
 
 class InvestigationStatus(str, Enum):
@@ -56,3 +57,5 @@ class Investigation(BaseModel):
         default=None,
         description="Shown in the UI whenever is_mock=True.",
     )
+    sources: list[EvidenceSource] = Field(default_factory=list)
+    chunks: list[EvidenceChunk] = Field(default_factory=list)

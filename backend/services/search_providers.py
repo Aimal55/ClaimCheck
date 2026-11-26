@@ -27,27 +27,33 @@ class WikipediaSearchProvider(SearchProvider):
         self.timeout = timeout
 
     def search(self, query: str, limit: int = 8) -> list[dict[str, Any]]:
-        try:
-            response = requests.get(
-                "https://en.wikipedia.org/w/api.php",
-                params={
-                    "action": "query",
-                    "generator": "search",
-                    "gsrsearch": query,
-                    "gsrlimit": max(1, min(limit, 50)),
-                    "prop": "extracts|info|pageimages",
-                    "exintro": 1,
-                    "explaintext": 1,
-                    "inprop": "url",
-                    "format": "json",
-                },
-                headers={"User-Agent": "ClaimCheck/1.0 (educational research app)"},
-                timeout=self.timeout,
-            )
-            response.raise_for_status()
-            pages = response.json().get("query", {}).get("pages", {})
-        except requests.RequestException as exc:
-            raise SearchProviderError("Wikipedia search failed.") from exc
+        last_error: requests.RequestException | None = None
+        for attempt in range(2):
+            try:
+                response = requests.get(
+                    "https://en.wikipedia.org/w/api.php",
+                    params={
+                        "action": "query",
+                        "generator": "search",
+                        "gsrsearch": query,
+                        "gsrlimit": max(1, min(limit, 50)),
+                        "prop": "extracts|info|pageimages",
+                        "exintro": 1,
+                        "explaintext": 1,
+                        "inprop": "url",
+                        "format": "json",
+                    },
+                    headers={"User-Agent": "ClaimCheck/1.0 (educational research app)"},
+                    timeout=self.timeout,
+                )
+                response.raise_for_status()
+                pages = response.json().get("query", {}).get("pages", {})
+                break
+            except requests.RequestException as exc:
+                last_error = exc
+                logger.warning("Wikipedia search attempt %d failed", attempt + 1)
+        else:
+            raise SearchProviderError("Wikipedia search failed after bounded retries.") from last_error
 
         results: list[dict[str, Any]] = []
         for page in pages.values():
@@ -76,16 +82,22 @@ class TavilySearchProvider(SearchProvider):
         self.timeout = timeout
 
     def search(self, query: str, limit: int = 8) -> list[dict[str, Any]]:
-        try:
-            response = requests.post(
-                "https://api.tavily.com/search",
-                json={"api_key": self.api_key, "query": query, "max_results": limit},
-                timeout=self.timeout,
-            )
-            response.raise_for_status()
-            payload = response.json()
-        except requests.RequestException as exc:
-            raise SearchProviderError("Tavily search failed.") from exc
+        last_error: requests.RequestException | None = None
+        for attempt in range(2):
+            try:
+                response = requests.post(
+                    "https://api.tavily.com/search",
+                    json={"api_key": self.api_key, "query": query, "max_results": limit},
+                    timeout=self.timeout,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                break
+            except requests.RequestException as exc:
+                last_error = exc
+                logger.warning("Tavily search attempt %d failed", attempt + 1)
+        else:
+            raise SearchProviderError("Tavily search failed after bounded retries.") from last_error
 
         results: list[dict[str, Any]] = []
         for item in payload.get("results", [])[:limit]:

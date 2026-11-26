@@ -212,6 +212,8 @@ def verify_claims(state: InvestigationGraphState) -> InvestigationGraphState:
 
     for claim in state.get("atomic_claims", []):
         claim_passages = [p for p in state.get("passages", []) if p["atomic_claim_id"] == claim["id"]]
+        valid_passage_ids = {p["id"] for p in claim_passages}
+        valid_source_urls = {p["source_url"] for p in claim_passages if p.get("source_url")}
         try:
             result = service.assess(claim["text"], claim_passages)
         except Exception as exc:
@@ -223,9 +225,9 @@ def verify_claims(state: InvestigationGraphState) -> InvestigationGraphState:
             "label": result.label,
             "confidence": result.confidence,
             "explanation": result.explanation,
-            "supporting_passage_ids": result.supporting_passage_ids,
-            "refuting_passage_ids": result.refuting_passage_ids,
-            "cited_source_urls": result.cited_source_urls,
+            "supporting_passage_ids": [p for p in result.supporting_passage_ids if p in valid_passage_ids],
+            "refuting_passage_ids": [p for p in result.refuting_passage_ids if p in valid_passage_ids],
+            "cited_source_urls": [u for u in result.cited_source_urls if u in valid_source_urls],
             "limitations": result.limitations,
             "is_mock": False,
         }

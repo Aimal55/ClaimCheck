@@ -228,11 +228,27 @@ def list_investigations(limit: int = 50) -> list[dict]:
     with _get_connection() as conn:
         rows = conn.execute(
             """
-            SELECT id, created_at, status, is_mock
+            SELECT id, created_at, status, is_mock, data
             FROM investigations
             ORDER BY created_at DESC
             LIMIT ?
             """,
             (limit,),
         ).fetchall()
-    return [dict(r) for r in rows]
+    summaries: list[dict] = []
+    for row in rows:
+        summary = dict(row)
+        data = summary.pop("data")
+        try:
+            investigation = Investigation.model_validate_json(data)
+            summary["submission_text"] = investigation.submission.text
+            summary["verdict_label"] = (
+                investigation.verdicts[0].label.value
+                if investigation.verdicts
+                else None
+            )
+        except Exception:
+            summary["submission_text"] = None
+            summary["verdict_label"] = None
+        summaries.append(summary)
+    return summaries

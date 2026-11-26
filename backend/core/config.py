@@ -25,11 +25,11 @@ class Settings(BaseSettings):
 
     # Gemini atomic-claim decomposition and verdicts
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.1-flash-lite"
     gemini_embedding_model: str = "gemini-embedding-001"
 
     # Search and retrieval
-    search_provider: str = "wikipedia"
+    search_provider: str = "tavily"
     tavily_api_key: str = ""
     search_result_limit: int = 8
     extraction_timeout_seconds: float = 12.0

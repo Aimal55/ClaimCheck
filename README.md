@@ -200,6 +200,12 @@ Mock mode remains available with `use_mock=true`; live mode is `use_mock=false`.
 
 ---
 
+## Streamlit dashboard
+
+ClaimCheck includes a dark research-intelligence dashboard with New Investigation, History, and About navigation. Investigation reports show verdicts, confidence, atomic claims, sources, evidence passages, technical retrieval details, and hidden raw JSON.
+
+---
+
 ## Development notes
 
 - **Never hardcode API keys.** Add them to `.env` and read via `Settings` in
